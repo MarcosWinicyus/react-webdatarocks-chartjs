@@ -1,6 +1,7 @@
 import React, {Component} from 'react';
 import language from './config/pr.json';
 import { Spin} from 'antd';
+import data from './data/data.csv'
 import {Bar} from 'react-chartjs-2';
 import * as WebDataRocks from './config/webdatarocks.react';
 
@@ -19,72 +20,8 @@ class Dashboard extends Component{
         }
     }
 
-    async initializeList(aqp) {
-        this.setState(previousState => {
-            return { ...previousState, loadingData: true };
-        });
-
-        const bolsao = await BolsaoServices.listAll({
-            limit: -1,
-            status: [true, false]
-        });
-
-        this.setState(prev => ({
-            ...prev,
-            loadingData: false,
-            data: bolsao.docs
-        }), () => this.processDataTable(bolsao.docs));
-    }
-
     async componentDidMount() {
-        await this.initializeList();
-    }
-
-    processDataTable = (bolsao) => {
-        let table = []
-
-        bolsao && bolsao.forEach( (item) => {
-        let nome_bolsao = item.nome
-        let safra = item.safra.descricao
-
-        item && item.grupo_produto && item.grupo_produto.forEach( (gp) => {
-            let grupo_produto = gp.nome
-            gp && gp.produtos && gp.produtos.forEach( (pd) => {
-            let produto = pd.nome
-            if (pd && pd.variacoes && pd.variacoes.length > 0){
-                pd.variacoes.forEach( (vr) => {
-                let peneira = vr.peneira
-                let bolsao_valor = vr.bolsao_valor
-                let saldo = vr.saldo
-                let vendas = vr.vendas
-                let embalagem = ' '
-                if(vr.embalagem){
-                    embalagem = vr.embalagem
-                }
-                
-                table.push({
-                    'safra':safra,
-                    'nome_bolsao':nome_bolsao,
-                    'grupo_produto':grupo_produto,
-                    'produto':produto,
-                    'peneira':peneira,
-                    'bolsao_valor':bolsao_valor,
-                    'saldo':saldo,
-                    'vendas':vendas,
-                    'embalagem':embalagem
-                })
-                
-                })
-            }
-            })
-        })
-        })
-
-        this.setState({
-            table: table,
-            gerar_table: true
-        })
-
+        await this.setState({ gerar_table: true })
     }
 
     prepareDataFunction = (rawData) => {
@@ -93,8 +30,8 @@ class Dashboard extends Component{
         let data = [] 
 
         rawData && rawData.data && rawData.data.forEach( raw => {
-            if (raw.c0 !== undefined && raw.r0 == undefined && raw.v0 !== undefined) {
-                labels.push(raw.c0);
+            if (raw.r0 !== undefined && raw.v0 !== undefined ) {
+                labels.push(raw.r0);
                 data.push(raw.v0)
 
             }
@@ -102,58 +39,42 @@ class Dashboard extends Component{
         
         result.labels = labels
         result.data = data
-        // result.label = rawData.meta.v0Name
-        result.label = 'Total Produtos'
+        result.label = rawData.meta.v0Name
 
         return result
     }
 
     getData = () => {
-        return this.state.table
+        return data
     }
 
     onReportComplete = () => {
-        webdatarocks.getData({
-                    "slice": {
-                        "reportFilters": [
-                            {
-                                "uniqueName": "nome_bolsao"
-                            }
-                        ],
-                        "rows": [
-                            {
-                                "uniqueName": "produto"
-                            }
-                        ],
-                        "columns": [
-                            {
-                                "uniqueName": "Measures"
-                            },
-                            {
-                                "uniqueName": "peneira"
-                            }
-                        ],
-                        "measures": [
-                            {
-                                "uniqueName": "saldo",
-                                "aggregation": "count",
-                                "availableAggregations": [
-                                    "count",
-                                    "distinctcount"
-                                ]
-                            }
-                        ]
-                    },
-        }, this.drawDoughnutChart, this.updateDoughnutChart);
+        window.webdatarocks.getData({
+            "slice": {
+                "rows": [
+                    {
+                        "uniqueName": "Category"
+                    }
+                ],
+                "columns": [
+                    {
+                        "uniqueName": "Measures"
+                    }
+                ],
+                "measures": [
+                    {
+                        "uniqueName": "Price",
+                        "aggregation": "sum"
+                    }
+                ]
+            },
+        }, this.drawBarChart, this.updateBarChart);
         
     }
 
-    drawDoughnutChart = (rawData) => {
+    drawBarChart = (rawData) => {
 
-        var data = this.prepareDataFunction(rawData);
-
-        console.log(rawData)
-
+        var data = this.prepareDataFunction(rawData)
         let data_chart = {
             datasets: [{
                 data: data.data,
@@ -169,14 +90,14 @@ class Dashboard extends Component{
         })
     }
 
-    updateDoughnutChart = (rawData) => {
+    updateBarChart = (rawData) => {
 
         this.setState({
             gerar_chart: false,
             data_chart:{}
         })
 
-        this.drawDoughnutChart(rawData)
+        this.drawBarChart(rawData)
     }
 
     customizeToolbar = (toolbar) => {
@@ -199,47 +120,32 @@ class Dashboard extends Component{
                     ? <div>
                         <WebDataRocks.Pivot 
                             toolbar={true} 
-                            report={{ 
-                                "dataSource":{ "data" : this.getData()},  
+                            report={{
+                                "dataSource": {
+                                    "dataSourceType": "csv",
+                                    "filename": "https://cdn.webdatarocks.com/data/data.csv"
+                                },
                                 "slice": {
-                                    "reportFilters": [
-                                        {
-                                            "uniqueName": "nome_bolsao"
-                                        }
-                                    ],
                                     "rows": [
                                         {
-                                            "uniqueName": "produto"
+                                            "uniqueName": "Category"
                                         }
                                     ],
                                     "columns": [
                                         {
                                             "uniqueName": "Measures"
-                                        },
-                                        {
-                                            "uniqueName": "peneira"
                                         }
                                     ],
                                     "measures": [
                                         {
-                                            "uniqueName": "saldo",
-                                            "aggregation": "count",
-                                            "availableAggregations": [
-                                                "count",
-                                                "distinctcount"
-                                            ]
+                                            "uniqueName": "Price",
+                                            "aggregation": "sum"
                                         }
                                     ]
-                                },
-                                "options": {
-                                    "grid": {
-                                        "title": "Bolsão Saldo"
-                                    },
-                                    "configuratorButton":false
                                 }
                             }} 
                             global={{"localization": language}}
-                            beforetoolbarcreated={this.customizeToolbar}
+                            // beforetoolbarcreated={this.customizeToolbar}
                             reportcomplete={
                                 () => this.onReportComplete()
                             }
@@ -251,7 +157,7 @@ class Dashboard extends Component{
                 }
                 {this.state.gerar_chart 
                     ?
-                    <div className='chart_bolsao'>
+                    <div className='chart'>
                         <Bar 
                             redraw={true}
                             data={this.state.data_chart}
@@ -271,7 +177,7 @@ class Dashboard extends Component{
                                             return data.labels[tooltipItems[0].index]
                                         },
                                         label: function (tooltipItems, data) {
-                                            return data.datasets[tooltipItems.datasetIndex].label + ': ' + tooltipItems.value.toString().split(".").join(",").replace(/\B(?=(\d{3})+(?!\d))/g, ".") + ' SC'
+                                            return data.datasets[tooltipItems.datasetIndex].label + ': US$ ' + tooltipItems.value.toString().split(".").join(",").replace(/\B(?=(\d{3})+(?!\d))/g, ".")
                                         }
                                     }
                                 },
@@ -283,11 +189,6 @@ class Dashboard extends Component{
                                     }
                                 },
                                 animation: false,
-                                title: {
-                                    display: true,
-                                    text: 'Quantidade Produtos por Peneira',
-                                    fontSize: 25
-                                },
                                 legend: {
                                     display: false
                                 },
